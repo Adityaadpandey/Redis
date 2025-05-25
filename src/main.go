@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"log/slog"
 	"net"
+	"time"
+
+	"github.com/adityaadpandey/Redis/client"
 )
 
 const defaultListenAddr = ":5832"
@@ -20,6 +24,9 @@ type Server struct {
 	addPeerCh chan *Peer
 	quitCh    chan struct{}
 	msgCh     chan []byte
+
+	//
+	kv *KV
 }
 
 func NewServer(cfg Config) *Server {
@@ -32,6 +39,7 @@ func NewServer(cfg Config) *Server {
 		addPeerCh: make(chan *Peer),
 		quitCh:    make(chan struct{}),
 		msgCh:     make(chan []byte),
+		kv:        NewKV(),
 	}
 }
 
@@ -44,6 +52,21 @@ func (s *Server) Start() error {
 	go s.loop()
 	slog.Info("server started", "listen_addr", s.ListenAddr)
 	return s.acceptLoop()
+}
+
+func (s *Server) handleRawMessage(rawMsg []byte) error {
+	cmd, err := parseCommand(string(rawMsg))
+	if err != nil {
+		slog.Error("parse command error", "error", err, "raw_msg", string(rawMsg))
+		return err
+	}
+	switch v := cmd.(type) {
+	case SetCommand:
+		slog.Info("Received SET command", "key", v.key, "value", v.val)
+		return s.kv.Set(v.key, v.val)
+
+	}
+	return nil
 }
 
 func (s *Server) loop() {
@@ -74,11 +97,6 @@ func (s *Server) acceptLoop() error {
 	}
 }
 
-func (s *Server) handleRawMessage(rawMsg []byte) error {
-	fmt.Println(string(rawMsg))
-	return nil
-}
-
 func (s *Server) handleConn(conn net.Conn) {
 	peer := NewPeer(conn, s.msgCh)
 	s.addPeerCh <- peer
@@ -90,5 +108,21 @@ func (s *Server) handleConn(conn net.Conn) {
 
 func main() {
 	server := NewServer(Config{})
-	log.Fatal(server.Start())
+	go func() {
+		log.Fatal(server.Start())
+	}()
+	time.Sleep(time.Second * 2) // Wait for server to start
+
+	for i := 0; i < 10; i++ {
+		client := client.New("localhost:5832")
+		key := "fooo" + fmt.Sprint(i)
+		if err := client.Set(context.TODO(), key, "bar"); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	fmt.Println(server.kv.data)
+	fmt.Println("All SET commands sent successfully")
+
+	select {}
 }

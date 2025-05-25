@@ -9,11 +9,15 @@ import (
 	"github.com/tidwall/resp"
 )
 
+const (
+	CommandSet = "SET"
+)
+
 type Command interface {
 }
 
 type SetCommand struct {
-	key, value string
+	key, val []byte
 }
 
 func parseCommand(raw string) (Command, error) {
@@ -28,10 +32,23 @@ func parseCommand(raw string) (Command, error) {
 		}
 		fmt.Printf("Read %s\n", v.Type())
 		if v.Type() == resp.Array {
-			for i, v := range v.Array() {
+			for i, value := range v.Array() {
+				switch value.String() {
+				case CommandSet:
+					if len(v.Array()) != 3 {
+						return nil, fmt.Errorf("invalid SET command: expected 3 arguments, got %d", len(v.Array()))
+					}
+					cmd := SetCommand{
+						key: v.Array()[1].Bytes(),
+						val: v.Array()[2].Bytes(),
+					}
+					return cmd, nil
+				default:
+				}
 				fmt.Printf("  #%d %s, value: '%s'\n", i, v.Type(), v)
 			}
 		}
 	}
-	return "foo", nil
+
+	return nil, fmt.Errorf("invalid or unknow command Received: %s", raw)
 }
