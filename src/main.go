@@ -17,15 +17,20 @@ type Config struct {
 	ListenAddr string
 }
 
+type Message struct {
+	cmd  Command
+	peer *Peer
+}
+
 type Server struct {
 	Config
 	peers     map[*Peer]bool
 	ln        net.Listener
 	addPeerCh chan *Peer
 	quitCh    chan struct{}
-	msgCh     chan []byte
+	msgCh     chan Message
 
-	//
+	//???
 	kv *KV
 }
 
@@ -38,7 +43,7 @@ func NewServer(cfg Config) *Server {
 		peers:     make(map[*Peer]bool),
 		addPeerCh: make(chan *Peer),
 		quitCh:    make(chan struct{}),
-		msgCh:     make(chan []byte),
+		msgCh:     make(chan Message),
 		kv:        NewKV(),
 	}
 }
@@ -54,16 +59,21 @@ func (s *Server) Start() error {
 	return s.acceptLoop()
 }
 
-func (s *Server) handleRawMessage(rawMsg []byte) error {
-	cmd, err := parseCommand(string(rawMsg))
-	if err != nil {
-		slog.Error("parse command error", "error", err, "raw_msg", string(rawMsg))
-		return err
-	}
-	switch v := cmd.(type) {
+func (s *Server) handleMessage(msg Message) error {
+
+	switch v := msg.cmd.(type) {
 	case SetCommand:
-		slog.Info("Received SET command", "key", v.key, "value", v.val)
 		return s.kv.Set(v.key, v.val)
+	case GetCommand:
+		val, ok := s.kv.Get(v.key)
+		if !ok {
+			return fmt.Errorf("key not found: %s", v.key)
+		}
+		_, err := msg.peer.Send(val)
+		if err != nil {
+			slog.Error("send value error", "error", err, "peer", msg.peer)
+			return err
+		}
 
 	}
 	return nil
@@ -72,15 +82,15 @@ func (s *Server) handleRawMessage(rawMsg []byte) error {
 func (s *Server) loop() {
 	for {
 		select {
-		case rawMsg := <-s.msgCh:
-			if err := s.handleRawMessage(rawMsg); err != nil {
+		case msg := <-s.msgCh:
+			if err := s.handleMessage(msg); err != nil {
 				slog.Error("handle raw message error", "error", err)
 			}
 		case <-s.quitCh:
 			return
 		case peer := <-s.addPeerCh:
 			s.peers[peer] = true
-			slog.Info("peer added", "peer", peer)
+			// slog.Info("peer added", "peer", peer)
 
 		}
 	}
@@ -100,7 +110,7 @@ func (s *Server) acceptLoop() error {
 func (s *Server) handleConn(conn net.Conn) {
 	peer := NewPeer(conn, s.msgCh)
 	s.addPeerCh <- peer
-	slog.Info("new connection", "peer", peer, "remote_addr", conn.RemoteAddr())
+	// slog.Info("new connection", "peer", peer, "remote_addr", conn.RemoteAddr())
 	if err := peer.readLoop(); err != nil {
 		slog.Error("peer read error", "error", err, "remoteAdd", conn.RemoteAddr())
 	}
@@ -113,16 +123,24 @@ func main() {
 	}()
 	time.Sleep(time.Second * 2) // Wait for server to start
 
+	c, err := client.New("localhost" + defaultListenAddr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	time.Sleep(time.Second)
 	for i := 0; i < 10; i++ {
-		client := client.New("localhost:5832")
 		key := "fooo" + fmt.Sprint(i)
-		if err := client.Set(context.TODO(), key, "bar"); err != nil {
+		fmt.Println("start SET\n ", key)
+		if err := c.Set(context.TODO(), key, "bar"+fmt.Sprint(i)); err != nil {
 			log.Fatal(err)
 		}
+		fmt.Println("start GET\n ")
+
+		val, err := c.Get(context.TODO(), key)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("GET", key, "=>", val)
 	}
 
-	fmt.Println(server.kv.data)
-	fmt.Println("All SET commands sent successfully")
-
-	select {}
 }
