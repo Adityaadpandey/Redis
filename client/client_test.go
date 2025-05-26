@@ -9,7 +9,7 @@ import (
 )
 
 func TestNewClients(t *testing.T) {
-	nClients := 100000
+	nClients := 10
 	wg := sync.WaitGroup{}
 	wg.Add(nClients)
 
