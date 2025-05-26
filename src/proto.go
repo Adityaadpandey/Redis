@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	CommandSet = "SET"
-	CommandGet = "GET"
+	CommandSet   = "SET"
+	CommandGet   = "GET"
+	CommandHello = "HELLO"
 )
 
 type Command interface {
@@ -23,6 +24,9 @@ type SetCommand struct {
 
 type GetCommand struct {
 	key []byte
+}
+type HelloCommand struct {
+	value string
 }
 
 func parseCommand(raw string) (Command, error) {
@@ -56,6 +60,11 @@ func parseCommand(raw string) (Command, error) {
 						val: v.Array()[2].Bytes(),
 					}
 					return cmd, nil
+				case CommandHello:
+					cmd := HelloCommand{
+						value: v.Array()[1].String(),
+					}
+					return cmd, nil
 				default:
 				}
 				// fmt.Printf("  #%d %s, value: '%s'\n", i, v.Type(), v)
@@ -64,4 +73,14 @@ func parseCommand(raw string) (Command, error) {
 	}
 
 	return nil, fmt.Errorf("invalid or unknow command Received: %s", raw)
+}
+
+func respWriteMap(m map[string]string) string {
+	buf := bytes.Buffer{}
+	buf.WriteString("%" + fmt.Sprintf("%d\r\n", len(m)))
+	for k, v := range m {
+		buf.WriteString(fmt.Sprintf("+%s\r\n", k))
+		buf.WriteString(fmt.Sprintf("+%s\r\n", v))
+	}
+	return buf.String()
 }

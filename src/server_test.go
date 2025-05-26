@@ -11,6 +11,15 @@ import (
 	"github.com/adityaadpandey/Redis/client"
 )
 
+func TestFooBar(t *testing.T) {
+	in := map[string]string{
+		"first":  "1",
+		"second": "2",
+	}
+	out := respWriteMap(in)
+	fmt.Println(out)
+}
+
 func TestNewClients(t *testing.T) {
 	server := NewServer(Config{})
 	go func() {

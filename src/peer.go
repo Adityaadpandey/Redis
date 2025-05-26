@@ -41,17 +41,14 @@ func (p *Peer) readLoop() error {
 		// fmt.Printf("Read %s\n", v.Type())
 		if v.Type() == resp.Array {
 			for _, value := range v.Array() {
+				var cmd Command
 				switch value.String() {
 				case CommandGet:
 					if len(v.Array()) != 2 {
 						return fmt.Errorf("invalid GET command: expected 2 arguments, got %d", len(v.Array()))
 					}
-					cmd := GetCommand{
+					cmd = GetCommand{
 						key: v.Array()[1].Bytes(),
-					}
-					p.msgCh <- Message{
-						cmd:  cmd,
-						peer: p,
 					}
 
 					// fmt.Printf("got GET cmd %+v", cmd)
@@ -59,16 +56,16 @@ func (p *Peer) readLoop() error {
 					if len(v.Array()) != 3 {
 						return fmt.Errorf("invalid SET command: expected 3 arguments, got %d", len(v.Array()))
 					}
-					cmd := SetCommand{
+					cmd = SetCommand{
 						key: v.Array()[1].Bytes(),
 						val: v.Array()[2].Bytes(),
 					}
+
+				default:
 					p.msgCh <- Message{
 						cmd:  cmd,
 						peer: p,
 					}
-					// fmt.Printf("got SET cmd %+v", cmd)
-				default:
 				}
 				// fmt.Printf("  #%d %s, value: '%s'\n", i, v.Type(), v)
 			}
