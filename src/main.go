@@ -1,14 +1,11 @@
 package main
 
 import (
-	"context"
+	"flag"
 	"fmt"
 	"log"
 	"log/slog"
 	"net"
-	"time"
-
-	"github.com/adityaadpandey/Redis/client"
 )
 
 const defaultListenAddr = ":5832"
@@ -53,9 +50,10 @@ func (s *Server) Start() error {
 	if err != nil {
 		return err
 	}
+
 	s.ln = ln
 	go s.loop()
-	slog.Info("server started", "listen_addr", s.ListenAddr)
+	slog.Info("server started", "listening at", s.ListenAddr)
 	return s.acceptLoop()
 }
 
@@ -89,8 +87,8 @@ func (s *Server) loop() {
 		case <-s.quitCh:
 			return
 		case peer := <-s.addPeerCh:
+			slog.Info("new peer connected", "remoteAddr", peer.conn.RemoteAddr())
 			s.peers[peer] = true
-			// slog.Info("peer added", "peer", peer)
 
 		}
 	}
@@ -117,30 +115,11 @@ func (s *Server) handleConn(conn net.Conn) {
 }
 
 func main() {
-	server := NewServer(Config{})
-	go func() {
-		log.Fatal(server.Start())
-	}()
-	time.Sleep(time.Second * 2) // Wait for server to start
-
-	c, err := client.New("localhost" + defaultListenAddr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	time.Sleep(time.Second)
-	for i := 0; i < 10; i++ {
-		key := "fooo" + fmt.Sprint(i)
-		fmt.Println("start SET\n ", key)
-		if err := c.Set(context.TODO(), key, "bar"+fmt.Sprint(i)); err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("start GET\n ")
-
-		val, err := c.Get(context.TODO(), key)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("GET", key, "=>", val)
-	}
+	listenAddr := flag.String("listenAddr", defaultListenAddr, "Server listen address")
+	flag.Parse()
+	server := NewServer(Config{
+		ListenAddr: *listenAddr,
+	})
+	log.Fatal(server.Start())
 
 }
