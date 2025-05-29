@@ -16,7 +16,7 @@ func TestNewClients(t *testing.T) {
 		log.Fatal(err)
 	}
 
-	if err := c.Set(context.TODO(), "key", 45678); err != nil {
+	if err := c.Set(context.TODO(), "key", "45678"); err != nil {
 		log.Fatal(err)
 	}
 	val, err := c.Get(context.TODO(), "key")
@@ -38,7 +38,7 @@ func TestNewClient(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		key := "fooo" + fmt.Sprint(i)
 		fmt.Println("start SET\n ", key)
-		if err := c.Set(context.TODO(), key, "bar"+fmt.Sprint(i)); err != nil {
+		if err := c.Set(context.TODO(), key, "134"); err != nil {
 			log.Fatal(err)
 		}
 		fmt.Println("start GET\n ")

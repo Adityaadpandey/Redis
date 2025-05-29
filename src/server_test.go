@@ -38,9 +38,9 @@ func TestNewClients(t *testing.T) {
 				log.Fatal(err)
 			}
 			defer c.Close()
-			key := fmt.Sprintf("client_%d", it)
-			value := fmt.Sprintf("client_x_%d", it)
-			if err := c.Set(context.TODO(), key, value); err != nil {
+			key := fmt.Sprintf("client__%d", it)
+			// value := fmt.Sprintf("client_x_%d", it)
+			if err := c.Set(context.TODO(), key, "123"); err != nil {
 				log.Fatal(err)
 			}
 			val, err := c.Get(context.TODO(), key)
